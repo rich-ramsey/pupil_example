@@ -85,6 +85,13 @@ data_all <- read_csv("data/datatfs.csv") %>%
 head(data_all)
 str(data_all)
 summary(data_all)
+
+## some notes on the variables
+## pid = participant id (1-24)
+## trial = trial 1-20 
+## condition = within-participant experimental manipulation, neutral vs reward
+## time = time of samples (technically, this is the average over the time-window e.g., 1 = avg of 1-200 samples at 1000Hz)
+## pupil = pupil diameter
 ```
 
 Here I just take the first 5 pids to make it a smaller dataset to make modelling faster.
