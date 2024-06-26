@@ -1,0 +1,317 @@
+---
+title: "wrangle"
+author: "Rich"
+date: "`r Sys.Date()`"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This file wrangles, summarises and plots pupil data from Exp1 in the reward and 
+motor slowing project.
+
+This is just a demo/example.
+
+# load the libraries that we will be using #
+
+## install ##
+
+```{r install-pkg}
+# install.packages(c("tidyverse", "RColorBrewer", "patchwork"))
+```
+
+take a snapshot of loaded packages and update the lock.file using renv
+
+```{r snapshot-renv}
+# take a snapshot and update the lock.file
+# renv::snapshot() # this is only necessary when new packages or installed or packages are updated.
+```
+
+## load ##
+
+```{r load-pkg}
+pkg <- c("tidyverse", "RColorBrewer", "patchwork")
+
+lapply(pkg, library, character.only = TRUE)
+```
+
+## plot settings ##
+
+theme settings for ggplot
+
+```{r plot-settings}
+theme_set(
+  theme_bw() +
+    theme(text = element_text(size = 18), 
+          title = element_text(size = 18),
+          legend.position = "bottom")
+)
+
+## Set the amount of dodge in figures
+pd <- position_dodge(0.7)
+pd2 <- position_dodge(1)
+```
+
+# section 1 #
+
+## read in the raw data or preprocessed data ##
+
+This data has already been preprocessed and wrangled. If you want to see how I wrangled the raw data to this point, I can send you the code. Just email me.
+
+For modelling using gams, I kept the sampling rate fairly low/sparse (5Hz), to reduce autocorrelation issues and to make the modelling faster as this is just a demo. In this particular case, where the experimental manipulation lasts for 20s, I don't think it really matters if the sampling rate is 5hz or 50Hz. Of course, I could see other situations where more data would be important.
+
+See Fink et al., 2024 (and van rij et al., 2019) for more info. on getting timeseries data setup and ready for modelling with gams.
+
+The basic logic is as follows:
+
+First, they suggested using a maximum sampling rate of 50hz to reduce autocorrelatino issues and ease model building time. Models take an age to build even at 50Hz.
+
+Also, they suggested NOT removing NANs (for GAMMs) and instead picking a sampling rate and then averaging over the non-NAN data in that window. e.g., if 1000Hz data, then keep all NANs and then choose a window (e.g., 100 samples and then create an average using mean, na.rm = TRUE). I think this makes sense and has the benefit of more pt data. The only way you could have missing data is if there were longer sequences of nans (that cover the entire sampling rate i.e., 0.2s or whatever), which is possible with this kind of data, but it should be minimised by averaging over a longer timeframe.
+
+This is all of the data (N=24).
+
+```{r read-processed-data}
+## all of the data
+data_all <- read_csv("data/datatfs.csv") %>%
+  select(-n, -sum_na) %>%
+  mutate(pid = factor(pid),
+         condition = factor(condition,
+                            levels = c("neutral", "reward"))) %>% 
+  rename(time = samples)
+head(data_all)
+str(data_all)
+summary(data_all)
+```
+
+Here I just take the first 5 pids to make it a smaller dataset to make modelling faster.
+
+```{r}
+## filter to only leave pid 1-5
+data <- data_all %>% 
+    filter(pid %in% 1:5)
+head(data)
+str(data)
+summary(data)
+```
+
+do some data checks on all of the data, just to get a sense of it
+
+```{r}
+## pid check
+data_all %>% 
+  distinct(pid)
+
+tally1 <- data_all %>%
+  group_by(pid, condition, trial) %>% 
+  distinct(time) %>% 
+  tally()
+tally1
+
+## 474 observations with a maximum of n=200 observations each
+## 200 datapoints per pid (24), per condition (2), per trial (10). (some trials removed due to exclusion criteria).
+## 24x2x10=480 (so by this analysis, 6 trials removed across 24 pts) to give 474 trials in total.
+## And then each trial was broken into 40s x 5Hz = 200.
+## Out of these 200 possible samples, some were NaN and removed as part of preprocessing. There may be other ways to go here but that's what we've done so far for this example.
+
+# check min and max samples
+data_all %>%
+  group_by(pid, condition) %>% 
+  summarise(max=max(time),
+            min=min(time))
+```
+
+now repeat the checks on the smaller version (pid1-5)
+
+```{r}
+## pid check
+data %>% 
+  distinct(pid)
+
+tally2 <- data %>%
+  group_by(pid, condition, trial) %>% 
+  distinct(time) %>% 
+  tally()
+tally2
+
+## 98 observations with a maximum of n=200 observations each
+## 200 datapoints per pid (5), per condition (2), per trial (10). (some trials removed due to exclusion criteria).
+## 5x2x10=100 (so by this analysis, 2 trials removed across 5 pts) to give 98 trials in total.
+## And then each trial was broken into 40s x 5Hz = 200.
+## Out of these 200 possible samples, some were NaN and removed as part of preprocessing. 
+
+# check min and max samples
+data %>%
+  group_by(pid, condition) %>% 
+  summarise(max=max(time),
+            min=min(time))
+```
+
+# section 2 #
+
+## create summary data for plotting ##
+
+## all of the data ##
+
+at the pid level
+
+```{r}
+data_all_pid <- data_all %>%
+  group_by(pid, condition, time) %>% 
+  summarise(mean = mean(pupil, na.rm = TRUE),
+            sd = sd(pupil, na.rm = TRUE),
+            n = length(unique(trial/2)), # 
+            sem = (sd/sqrt(length(unique(trial/2)))),
+            ci = sem*1.96)
+head(data_all_pid)
+```
+
+at the group level
+
+```{r}
+data_all_group <- data_all %>%
+  group_by(condition, time) %>% 
+  summarise(mean = mean(pupil, na.rm = TRUE),
+            sd = sd(pupil, na.rm = TRUE),
+            n = length(unique(pid)), # n here is the total pids per condition
+            sem = (sd/sqrt(length(unique(pid)))),
+            ci = sem*1.96)
+head(data_all_group)
+```
+
+
+## data for 5 pids ##
+
+at the pid level
+
+```{r}
+data_pid <- data %>%
+  group_by(pid, condition, time) %>% 
+  summarise(mean = mean(pupil, na.rm = TRUE),
+            sd = sd(pupil, na.rm = TRUE),
+            n = length(unique(trial/2)), # 
+            sem = (sd/sqrt(length(unique(trial/2)))),
+            ci = sem*1.96)
+head(data_pid)
+```
+
+at the group level
+
+```{r}
+data_group <- data %>%
+  group_by(condition, time) %>% 
+  summarise(mean = mean(pupil, na.rm = TRUE),
+            sd = sd(pupil, na.rm = TRUE),
+            n = length(unique(pid)), # n here is the total pids per condition
+            sem = (sd/sqrt(length(unique(pid)))),
+            ci = sem*1.96)
+head(data_group)
+```
+
+# section 3 #
+
+## make some ribbon plots ##
+
+## plot all of the data ##
+
+facet by pid
+
+```{r}
+p3.1 <- ggplot(data_all_pid,
+       aes(x = time, y = mean, fill = condition)) +
+      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+      scale_colour_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Dark2") +
+      facet_wrap(~pid, ncol=5)
+p3.1
+
+# ggsave("figures/summary_ribbon.jpeg",
+#        width = 10, height = 8)
+```
+
+group average summary
+
+```{r}
+p3.2 <- ggplot(data_all_group,
+       aes(x = time, y = mean, fill = condition)) +
+      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+      scale_colour_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Dark2") 
+p3.2
+
+# ggsave("figures/summary_ribbon.jpeg",
+#        width = 10, height = 8)
+```
+
+## plot data for pid 1-5 ##
+
+facet by pid
+
+```{r}
+p3.3 <- ggplot(data_pid,
+       aes(x = time, y = mean, fill = condition)) +
+      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+      scale_colour_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Dark2") +
+      facet_wrap(~pid)
+p3.3
+
+# ggsave("figures/summary_ribbon.jpeg",
+#        width = 10, height = 8)
+```
+
+group average summary
+
+```{r}
+p3.4 <- ggplot(data_group,
+       aes(x = time, y = mean, fill = condition)) +
+      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+      scale_colour_brewer(palette = "Dark2") +
+      scale_fill_brewer(palette = "Dark2") 
+p3.4
+
+# ggsave("figures/summary_ribbon.jpeg",
+#        width = 10, height = 8)
+```
+
+## plot all data and pid1-5 data to compare ##
+
+```{r}
+p3.5 <- (p3.2 + ggtitle("N=24")) | (p3.4 + ggtitle("N=5"))
+p3.5
+
+ggsave("figures/summary_ribbon.jpeg",
+       width = 10, height = 8)
+```
+
+
+## save out some data files ##
+
+```{r}
+## data for pid=24
+## all of the data (but extra wrangling)
+write_csv(data_all, "data/data_n24.csv")
+## summary data
+write_csv(data_all_pid, "data/data_pid_n24.csv")
+write_csv(data_all_group, "data/data_all_n24.csv")
+
+## data for pid=5
+## all of the data (but extra wrangling)
+write_csv(data, "data/data_n5.csv")
+## summary data
+write_csv(data_pid, "data/data_pid_n5.csv")
+write_csv(data_group, "data/data_all_n5.csv")
+```
+
+
