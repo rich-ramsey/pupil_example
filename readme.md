@@ -63,6 +63,9 @@ This file visualises and tabulates parameters and/or posterior predictions of in
 ## There are four sub-folders, which have largely self-explanatory titles: ##
 
 **1. /figures/**
+
 **2. /tables/**
+
 **3. /models/**
+
 **4. /data/**
