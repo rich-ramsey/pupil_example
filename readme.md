@@ -2,7 +2,7 @@ This project tries to provide an example of how you might model pupilometry data
 
 Sounds complicated. But it's just a multi-level (mixed) model that can fit curves instead of straight lines AND the model decides on the curviness or wiggliness. All of which is rather satisfying compared to many alternatives.
 
-## Backgroup reading and material ##
+# Backgroup reading and material #
 
 1. Key modelling papers are here:
 
@@ -69,3 +69,20 @@ This file visualises and tabulates parameters and/or posterior predictions of in
 **3. /models/**
 
 **4. /data/**
+
+## A brief description of the dataset ##
+
+[[note - some of these details might be wrong. Jenny knows the truth.]]
+
+The data comes from Jenny's PhD work, which is about motor slowing. In this case, the task involves wrist flexion and extension movements (as fast as possible) for 40 seconds. After 20 seconds, there is an experimental manipulation, where a cue is presented. The cue can signal that a reward is available (1 CHF, I think), if they wrist-tap quickly, or that no reward is available. Therefore, the design has one within-participant experimental factor with two levels (neutral and reward).
+
+There are 20 trials per participant (half neutral, half reward). Order of condition was randomised across each pid's trials.
+
+In this project I only include pupil size over time (movement cycles are not included here).
+
+And the sampling rate for pupil size measurements was ~60Hz during data collection. But the data analysed here has been re-sampled to 5Hz, so that modelling will be a lot faster. And to minimise issues with auto-correlation. 
+
+
+
+
+
