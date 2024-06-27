@@ -115,8 +115,21 @@ You can do this, but my understanding is that these don't make much sense on the
 
 e.g., the terms in isolation are hard to interpret in a meaningful way. Take a look below.
 
+this is the summary of the model
+
 ```{r}
 summary(bp1)
+```
+
+and these are all of the parameters
+
+```{r}
+vars <- as_tibble(get_variables(bp1)) %>%
+  rename(term=value) %>% 
+  filter(! term %in% c("lprior", "accept_stat__", "treedepth__", "lp__",
+                       "divergent__", "n_leapfrog__", "energy__", "stepsize__"),
+         str_detect(term, "zs", negate = TRUE)) %>% 
+  print(n=Inf)
 ```
 
 instead you need to take all the parameters and generate posterior predictions because it is the combination of parameters that the model is using to make predictions.
