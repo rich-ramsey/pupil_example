@@ -41,7 +41,7 @@ take a snapshot of loaded packages and update the lock.file using renv
 
 ```{r load-pkg}
 pkg <- c("cmdstanr", "standist", "tidyverse", "RColorBrewer", "patchwork", 
-         "brms", "tidybayes", "bayesplot", "future", "parallel")
+         "brms", "tidybayes", "bayesplot", "future", "parallel", "rstan")
 
 lapply(pkg, library, character.only = TRUE)
 ```
@@ -53,6 +53,8 @@ options(brms.backend = "cmdstanr",
         mc.cores = parallel::detectCores(),
         future.fork.enable = TRUE,
         future.rng.onMisuse = "ignore") ## automatically set in RStudio
+
+rstan_options(auto_write = TRUE)
 
 supportsMulticore()
 
@@ -66,8 +68,8 @@ theme settings for ggplot
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -114,7 +116,7 @@ write_csv(datam, "data/datam_n5.csv")
 This is useful if you want to look at aspects of a previously compiled model
 
 ```{r}
-
+bp1 <- readRDS("models/bp1.rds")
 ```
 
 # section 1 #
@@ -153,35 +155,41 @@ with sem at the pid level
 
 ```{r}
 p1.1 <- ggplot(data_pid,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") +
-      scale_x_continuous(breaks=seq(15000,25000,5000)) +
-      facet_wrap(~pid, nrow = 1)
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels= seq(15,25,5)) +
+  scale_y_continuous(limits=c(-0.5, 1),
+                     breaks = seq(-0.5, 1, 0.5)) +
+  facet_wrap(~pid, nrow = 2) 
 p1.1
 
-ggsave("figures/datam_ribbon_pid.jpeg",
-       width = 10, height = 8)
+ggsave("figures/datam_ribbon_n5_pid.jpeg",
+       width = 10, height = 8, dpi = 800)
 ```
 
 with sem at the group level
 
 ```{r}
 p1.2 <- ggplot(data_group,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_x_continuous(breaks=seq(15000,25000,5000)) +
-      scale_fill_brewer(palette = "Dark2")
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels= seq(15,25,5)) +
+  scale_y_continuous(limits=c(-0.2, 0.6),
+                     breaks = seq(-0.2, 0.6, 0.2)) +
+  scale_fill_brewer(palette = "Dark2")
 p1.2
 
-ggsave("figures/datam_ribbon_group.jpeg",
-       width = 10, height = 8)
+ggsave("figures/datam_ribbon_n5_group.jpeg",
+       width = 10, height = 8, dpi = 800)
 ```
 
 # section 2 #

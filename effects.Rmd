@@ -37,7 +37,8 @@ take a snapshot of loaded packages and update the lock.file using renv
 
 ```{r load-pkg}
 pkg <- c("tidyverse", "RColorBrewer", "patchwork", "brms", 
-         "tidybayes", "bayesplot", "future", "parallel", "modelr", "flextable")
+         "tidybayes", "bayesplot", "future", "parallel", "modelr",
+         "flextable", "rstan")
 
 lapply(pkg, library, character.only = TRUE)
 ```
@@ -48,6 +49,8 @@ lapply(pkg, library, character.only = TRUE)
 options(mc.cores = parallel::detectCores(),
         future.fork.enable = TRUE,
         future.rng.onMisuse = "ignore") ## automatically set in RStudio
+
+rstan_options(auto_write = TRUE)
 
 supportsMulticore()
 
@@ -61,8 +64,8 @@ theme settings for ggplot
 ```{r, eval = F}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -127,7 +130,8 @@ and these are all of the parameters
 vars <- as_tibble(get_variables(bp1)) %>%
   rename(term=value) %>% 
   filter(! term %in% c("lprior", "accept_stat__", "treedepth__", "lp__",
-                       "divergent__", "n_leapfrog__", "energy__", "stepsize__"),
+                       "divergent__", "n_leapfrog__", "energy__",
+                       "stepsize__"),
          str_detect(term, "zs", negate = TRUE)) %>% 
   print(n=Inf)
 ```
@@ -140,26 +144,28 @@ instead you need to take all the parameters and generate posterior predictions b
 
 let's do this for bp1
 
+by pid
+
 ```{r}
-epred <- datam %>%
+epred_pid <- datam %>%
   group_by(pid, condition) %>% 
   data_grid(time = seq(15001, 25000, 100)) %>%
-  add_epred_draws(bp1) %>% 
-head(epred)
+  add_epred_draws(bp1) ## default here is re_forumla = NULL, which inlcudes all varying effects of pid
+head(epred_pid)
 ```
 
 pred check
 
 ```{r}
 ## check the right number of samples per pid
-epred %>%
+epred_pid %>%
   ungroup() %>%
   group_by(pid) %>% 
   distinct(time) %>% 
   tally()
 
 ## and in total
-epred %>%
+epred_pid %>%
   ungroup() %>%
   distinct(time) %>% 
   tally()
@@ -171,47 +177,56 @@ plot by pid
 
 ```{r}
 p2.1 <- 
-  ggplot(data = epred, aes(x = time, y = .epred, 
+  ggplot(data = epred_pid, aes(x = time, y = .epred, 
                                 colour=condition, fill = condition)) +
-  stat_lineribbon(.width = .95, alpha = 0.7) +
+  stat_lineribbon(alpha=0.5, .width = .95) +
   geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
   scale_fill_brewer(palette = "Dark2") +
   scale_colour_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks=seq(15000,25000,5000)) +
-  facet_wrap(~pid, nrow=1) +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels=seq(15,25,5)) +
+  scale_y_continuous(limits=c(-0.25, 0.65),
+                     breaks = seq(-0.2, 0.6, 0.2)) +
+  facet_wrap(~pid, nrow=2) +
   labs(title = "Posterior predictions by participant")
 p2.1
 
-ggsave("figures/preds_pid.jpeg",
-       width = 10, height = 8)
+ggsave("figures/ppred_pid.jpeg",
+       width = 10, height = 6, dpi = 800)
 ```
 
-create group data
+create group-based posterior preds
+
+keep pid in the data but set re_formula to NA.
 
 ```{r}
-epred_group <- epred %>%
-  ungroup() %>% 
-  group_by(condition, time, .draw) %>% 
-  summarise(group_epred = mean(.epred))
-epred_group
+epred_group <- datam %>%
+  group_by(pid, condition) %>% 
+  data_grid(time = seq(15001, 25000, 100)) %>%
+  add_epred_draws(bp1,
+                  re_formula = NA) 
+head(epred_group)
 ```
 
-plot the group data
+quick plot
 
 ```{r}
 p2.2 <-
-  ggplot(data = epred_group, aes(x = time, y = group_epred,
+  ggplot(data = epred_group, aes(x = time, y = .epred,
                                 colour=condition, fill = condition)) +
-  stat_lineribbon(.width = .95, alpha = 0.7) +
+  stat_lineribbon(alpha = 0.5, .width = .95) +
   geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
   scale_fill_brewer(palette = "Dark2") +
   scale_colour_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks=seq(15000,25000,5000)) +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels=seq(15,25,5)) +
+  scale_y_continuous(limits=c(-0.25, 0.65),
+                     breaks = seq(-0.2, 0.6, 0.2)) +
   labs(title = "Posterior predictions")
 p2.2
 
-ggsave("figures/preds_group.jpeg",
-       width = 10, height = 8)
+ggsave("figures/ppred_group.jpeg",
+       width = 8, height = 6, dpi = 800)
 ```
 
 ## calculate quantile intervals and make a table ##
@@ -220,11 +235,11 @@ quantile intervals at the group level (just pick 1s timebins to make it simpler)
 
 ```{r}
 epred_group_q <- epred_group %>%
-  group_by(.draw) %>% 
-  slice(seq(1, n(), 10)) %>% 
-  mutate(time=factor(time)) %>% 
+  group_by(.draw) %>%
+  slice(seq(1, n(), 10)) %>%
+  mutate(time=factor(time)) %>%
   group_by(condition, time) %>% 
-  median_qi(group_epred)
+  median_qi(.epred)
 head(epred_group_q)
 ```
 
@@ -234,7 +249,6 @@ make a table
 ## make a table using flextable (still needs a title but that can be fixed later, depending on the doc it is being used in)
 epred_tab <- epred_group_q %>%
   select(-.width, -.point, -.interval) %>%
-  rename(.epred = group_epred) %>% 
   mutate(across(where(is.double), \(x) round(x, 2))) %>% 
   flextable() 
 epred_tab
@@ -243,6 +257,9 @@ epred_tab
 save_as_image(epred_tab, path = "tables/epred.png")
 
 ## this table still needs polishing, but you get the basic idea
+
+## and some tabular data maybe
+write_csv(epred_group_q, "tables/epred_group_q.csv")
 ```
 
 # section 3 #
@@ -254,10 +271,9 @@ save_as_image(epred_tab, path = "tables/epred.png")
 wrangle 
 
 ```{r}
-epred_diff <- epred %>%
-  ungroup() %>% 
-  select(pid, condition, time, .draw, .epred) %>% 
-  pivot_wider(names_from = "condition",
+epred_diff <- epred_pid %>%
+  pivot_wider(id_cols = c(pid, time, .draw),
+              names_from = "condition",
               values_from = ".epred") %>% 
   mutate(diff = reward - neutral)
 head(epred_diff)
@@ -267,46 +283,50 @@ plot
 
 ```{r}
 p3.1 <- ggplot(epred_diff, aes(x = time, y = diff)) +  
-  stat_lineribbon(.width = .95, alpha = 0.7) +
+  stat_lineribbon(.width = .95, alpha = 0.5) +
   geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", colour = "darkred") +
   scale_fill_brewer(palette = "Dark2") +
   scale_colour_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks=seq(15000,25000,5000)) +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels=seq(15,25,5)) +
   theme(legend.position = "none") +
-  facet_wrap(~pid, nrow = 1) +
+  facet_wrap(~pid, nrow = 2) +
   labs(title = "Posterior predictions (reward > neutral)")
 p3.1
 
-ggsave ("figures/preds_diff_pid.jpeg",
-        width = 10, height = 8)
+ggsave ("figures/ppred_diff_pid.jpeg",
+        width = 10, height = 8, dpi = 800)
 ```
 
 group diff
 
 ```{r}
-epred_diff_group <- epred_diff %>% 
-  group_by(time, .draw) %>% 
-  summarise(group_diff = mean(diff))
+epred_diff_group <- epred_group %>%
+  pivot_wider(id_cols = c(pid, time, .draw),
+              names_from = "condition",
+              values_from = ".epred") %>% 
+  mutate(diff = reward - neutral)
 epred_diff_group
 ```
 
 plot
 
 ```{r}
-p3.2 <- ggplot(data = epred_diff_group, aes(x = time, y = group_diff)) +
-  stat_lineribbon(.width = .95, alpha = 0.7) +
+p3.2 <- ggplot(data = epred_diff_group, aes(x = time, y = diff)) +
+  stat_lineribbon(.width = .95, alpha = 0.5) +
   geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
   geom_hline(yintercept = 0, linetype = "solid", colour = "darkred") +
   scale_fill_brewer(palette = "Dark2") +
   scale_colour_brewer(palette = "Dark2") +
-  scale_x_continuous(breaks=seq(15000,25000,5000)) +
+  scale_x_continuous(breaks=seq(15000,25000,5000),
+                     labels=seq(15,25,5)) +
   theme(legend.position = "none") +
   labs(title = "Posterior predictions (reward > neutral)")
 p3.2
 
-ggsave ("figures/ppreds_diff_group.jpeg",
-        width = 10, height = 8)
+ggsave ("figures/ppred_diff_group.jpeg",
+        width = 10, height = 8, dpi = 800)
 ```
 
 
@@ -322,22 +342,24 @@ epred_diff_group_q <- epred_diff_group %>%
   slice(seq(1, n(), 10)) %>% 
   mutate(time=factor(time)) %>% 
   group_by(time) %>% 
-  median_qi(group_diff)
+  median_qi(diff)
 head(epred_diff_group_q)
 ```
 
 plot using geom_interval (this is less informative than the ribbon plot, but it might be more familiar)
 
 ```{r}
-p3.3 <- ggplot(data = epred_diff_group_q, aes(x = time, y = group_diff)) +
+p3.3 <- ggplot(data = epred_diff_group_q, aes(x = time, y = diff)) +
   geom_pointinterval(aes(ymin=.lower, ymax=.upper),
                      position = position_dodge(width = .7)) +
   geom_hline(yintercept = 0, linetype = "solid", colour = "darkred") +
   scale_fill_brewer(palette = "Dark2") +
-  scale_colour_brewer(palette = "Dark2") 
+  scale_colour_brewer(palette = "Dark2") +
+  scale_x_discrete(breaks=seq(15001,24001,1000),
+                   labels=seq(15,24,1)) 
 p3.3
 
-ggsave ("figures/ppreds_diff_interval.jpeg",
+ggsave ("figures/ppred_diff_interval.jpeg",
         width = 8, height = 4)
 ```
 
@@ -347,7 +369,6 @@ make a table
 ## make a table using flextable (still needs a title but that can be fixed later, depending on the doc it is being used in)
 epred_diff_tab <- epred_diff_group_q %>%
   select(-.width, -.point, -.interval) %>%
-  rename(.epred_diff = group_diff) %>% 
   mutate(across(where(is.double), \(x) round(x, 2))) %>% 
   flextable() 
 epred_diff_tab
@@ -356,5 +377,23 @@ epred_diff_tab
 save_as_image(epred_diff_tab, path = "tables/epred_diff.png")
 
 ## this table still needs polishing, but you get the basic idea
+
+## and some tabular data maybe
+write_csv(epred_diff_group_q, "tables/epred_diff_group_q.csv")
 ```
 
+
+# section 4 #
+
+## interim conclusion ##
+
+If you were doing this for real, you would include more data points in the model and run the model for longer (i.e., all 40s of time) and/or include more than 100 timepoints in the posterior predictions. 
+And of course test more than 5 participants (i.e., use all 24 pids).
+
+## outstanding issues to fix ##
+
+the difference score seems too precise in the posterior predictions.
+I would expect the error bars to be wider.
+Check this with Sven and see what he suggests.
+In principle, the difference score could be more precise than the condition estimate.
+But, as a cautious individual, I'd want to check that assumption first and de-bug to make sure the code is correct.

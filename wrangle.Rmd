@@ -46,8 +46,8 @@ theme settings for ggplot
 ```{r plot-settings}
 theme_set(
   theme_bw() +
-    theme(text = element_text(size = 18), 
-          title = element_text(size = 18),
+    theme(text = element_text(size = 18, face = "bold"), 
+          title = element_text(size = 18, face = "bold"),
           legend.position = "bottom")
 )
 
@@ -99,7 +99,7 @@ Here I just take the first 5 pids to make it a smaller dataset to make modelling
 ```{r}
 ## filter to only leave pid 1-5
 data <- data_all %>% 
-    filter(pid %in% 1:5)
+  filter(pid %in% 1:5)
 head(data)
 str(data)
 summary(data)
@@ -228,34 +228,41 @@ facet by pid
 
 ```{r}
 p3.1 <- ggplot(data_all_pid,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") +
-      facet_wrap(~pid, ncol=5)
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  facet_wrap(~pid, ncol=5) +
+  scale_x_continuous(breaks=seq(0,40000,10000),
+                     labels = seq(0,40,10)) 
 p3.1
 
-# ggsave("figures/summary_ribbon.jpeg",
-#        width = 10, height = 8)
+ggsave("figures/ribbon_all_pid.jpeg",
+       width = 12, height = 10, dpi = 800)
 ```
 
 group average summary
 
 ```{r}
 p3.2 <- ggplot(data_all_group,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") 
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks=seq(0,40000,10000),
+                     labels = seq(0,40,10)) +
+  scale_y_continuous(limits=c(-0.2, 0.6),
+                     breaks = seq(-0.2, 0.6, 0.2)) 
 p3.2
 
-# ggsave("figures/summary_ribbon.jpeg",
-#        width = 10, height = 8)
+ggsave("figures/ribbon_all_group.jpeg",
+       width = 10, height = 8, dpi = 800)
 ```
+
 
 ## plot data for pid 1-5 ##
 
@@ -263,43 +270,51 @@ facet by pid
 
 ```{r}
 p3.3 <- ggplot(data_pid,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") +
-      facet_wrap(~pid)
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  facet_wrap(~pid) +
+  scale_x_continuous(breaks=seq(0,40000,10000),
+                     labels = seq(0,40,10)) 
 p3.3
 
-# ggsave("figures/summary_ribbon.jpeg",
-#        width = 10, height = 8)
+ggsave("figures/ribbon_n5_pid.jpeg",
+       width = 10, height = 8, dpi = 800)
 ```
 
 group average summary
 
 ```{r}
 p3.4 <- ggplot(data_group,
-       aes(x = time, y = mean, fill = condition)) +
-      geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
-      geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
-      geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
-      scale_colour_brewer(palette = "Dark2") +
-      scale_fill_brewer(palette = "Dark2") 
+               aes(x = time, y = mean, fill = condition)) +
+  geom_line(aes(colour = condition), alpha = 1, linewidth = 1) +
+  geom_ribbon(aes(ymin=mean-sem, ymax=mean+sem), alpha = 0.5) +
+  geom_vline(xintercept = 20000, linetype = "dashed", colour = "darkgrey") +
+  scale_colour_brewer(palette = "Dark2") +
+  scale_fill_brewer(palette = "Dark2") +
+  scale_x_continuous(breaks=seq(0,40000,10000),
+                     labels = seq(0,40,10)) +
+  scale_y_continuous(limits=c(-0.2, 0.6),
+                     breaks = seq(-0.2, 0.6, 0.2)) 
 p3.4
 
-# ggsave("figures/summary_ribbon.jpeg",
-#        width = 10, height = 8)
+ggsave("figures/ribbon_n5_group.jpeg",
+       width = 10, height = 8, dpi = 800)
 ```
 
 ## plot all data and pid1-5 data to compare ##
 
 ```{r}
-p3.5 <- (p3.2 + ggtitle("N=24")) | (p3.4 + ggtitle("N=5"))
+p3.5 <- ((p3.2 + ggtitle("N=24")) | (p3.4 + ggtitle("N=5"))) +
+  plot_layout(guides = "collect",
+              axes = "collect")
 p3.5
 
-ggsave("figures/summary_ribbon.jpeg",
-       width = 10, height = 8)
+ggsave("figures/ribbon_all_vs_n5.jpeg",
+       width = 12, height = 8, dpi = 800)
 ```
 
 
